@@ -22,8 +22,8 @@ export function setupIpcHandlers(): void {
     const stmt = db.prepare(`
       INSERT INTO products (name, description, sku, price, cost_price, stock_quantity, low_stock_threshold, category,
                            product_type, tire_width, tire_aspect_ratio, tire_diameter, tire_load_index, tire_speed_rating,
-                           wheel_diameter, wheel_width, wheel_pcd, wheel_offset, wheel_center_bore, size_display)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           wheel_diameter, wheel_width, wheel_pcd, wheel_offset, wheel_center_bore, wheel_stud_count, wheel_stud_type, size_display)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       product.name,
@@ -45,6 +45,8 @@ export function setupIpcHandlers(): void {
       product.wheel_pcd || null,
       product.wheel_offset || null,
       product.wheel_center_bore || null,
+      product.wheel_stud_count || null,
+      product.wheel_stud_type || null,
       product.size_display || null
     );
     return { id: result.lastInsertRowid, ...product };
@@ -58,7 +60,7 @@ export function setupIpcHandlers(): void {
           stock_quantity = ?, low_stock_threshold = ?, category = ?,
           product_type = ?, tire_width = ?, tire_aspect_ratio = ?, tire_diameter = ?, 
           tire_load_index = ?, tire_speed_rating = ?, wheel_diameter = ?, wheel_width = ?,
-          wheel_pcd = ?, wheel_offset = ?, wheel_center_bore = ?, size_display = ?
+          wheel_pcd = ?, wheel_offset = ?, wheel_center_bore = ?, wheel_stud_count = ?, wheel_stud_type = ?, size_display = ?
       WHERE id = ?
     `);
     stmt.run(
@@ -81,6 +83,8 @@ export function setupIpcHandlers(): void {
       product.wheel_pcd || null,
       product.wheel_offset || null,
       product.wheel_center_bore || null,
+      product.wheel_stud_count || null,
+      product.wheel_stud_type || null,
       product.size_display || null,
       id
     );
@@ -195,12 +199,19 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('wheelSizes:create', async (_, sizeData: any) => {
     const db = getDatabase();
-    const sizeDisplay = sizeData.size_display || `${sizeData.diameter}x${sizeData.width}`;
+    // Build size display with stud info if available
+    let sizeDisplay = sizeData.size_display;
+    if (!sizeDisplay) {
+      sizeDisplay = `${sizeData.diameter}x${sizeData.width}`;
+      if (sizeData.pcd) sizeDisplay += ` PCD:${sizeData.pcd}`;
+      if (sizeData.stud_count) sizeDisplay += ` ${sizeData.stud_count} Stud`;
+      if (sizeData.stud_type) sizeDisplay += ` (${sizeData.stud_type})`;
+    }
     
     try {
       const stmt = db.prepare(`
-        INSERT INTO wheel_sizes (diameter, width, pcd, offset, center_bore, size_display)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO wheel_sizes (diameter, width, pcd, offset, center_bore, stud_count, stud_type, size_display)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const result = stmt.run(
         sizeData.diameter,
@@ -208,6 +219,8 @@ export function setupIpcHandlers(): void {
         sizeData.pcd || null,
         sizeData.offset || null,
         sizeData.center_bore || null,
+        sizeData.stud_count || null,
+        sizeData.stud_type || null,
         sizeDisplay
       );
       return { id: result.lastInsertRowid, ...sizeData, size_display: sizeDisplay };

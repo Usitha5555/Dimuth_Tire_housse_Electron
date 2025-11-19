@@ -273,6 +273,8 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
     wheel_pcd: '',
     wheel_offset: '',
     wheel_center_bore: '',
+    wheel_stud_count: '',
+    wheel_stud_type: '',
     size_display: '',
   });
 
@@ -308,6 +310,8 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
         wheel_pcd: product.wheel_pcd || '',
         wheel_offset: product.wheel_offset || '',
         wheel_center_bore: product.wheel_center_bore || '',
+        wheel_stud_count: product.wheel_stud_count?.toString() || '',
+        wheel_stud_type: product.wheel_stud_type || '',
         size_display: product.size_display || '',
       });
     } else {
@@ -335,6 +339,8 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
         wheel_pcd: '',
         wheel_offset: '',
         wheel_center_bore: '',
+        wheel_stud_count: '',
+        wheel_stud_type: '',
         size_display: '',
       });
     }
@@ -411,6 +417,8 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
         pcd: formData.wheel_pcd || null,
         offset: formData.wheel_offset || null,
         center_bore: formData.wheel_center_bore || null,
+        stud_count: formData.wheel_stud_count ? parseInt(formData.wheel_stud_count) : null,
+        stud_type: formData.wheel_stud_type || null,
       });
       await loadBrandsAndSizes();
       // Auto-select the newly added size
@@ -446,6 +454,11 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
         wheel_size_id: sizeId,
         wheel_diameter: size.diameter.toString(),
         wheel_width: size.width.toString(),
+        wheel_pcd: size.pcd || '',
+        wheel_offset: size.offset || '',
+        wheel_center_bore: size.center_bore || '',
+        wheel_stud_count: size.stud_count?.toString() || '',
+        wheel_stud_type: size.stud_type || '',
         size_display: size.size_display,
       });
     }
@@ -464,7 +477,11 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
       }
     } else if (formData.product_type === 'alloy_wheel') {
       if (formData.wheel_diameter && formData.wheel_width) {
-        setFormData(prev => ({ ...prev, size_display: `${formData.wheel_diameter}x${formData.wheel_width}` }));
+        let display = `${formData.wheel_diameter}x${formData.wheel_width}`;
+        if (formData.wheel_pcd) display += ` PCD:${formData.wheel_pcd}`;
+        if (formData.wheel_stud_count) display += ` ${formData.wheel_stud_count} Stud`;
+        if (formData.wheel_stud_type) display += ` (${formData.wheel_stud_type})`;
+        setFormData(prev => ({ ...prev, size_display: display }));
       }
     }
   }, [
@@ -510,6 +527,8 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
         productData.wheel_pcd = formData.wheel_pcd || null;
         productData.wheel_offset = formData.wheel_offset || null;
         productData.wheel_center_bore = formData.wheel_center_bore || null;
+        productData.wheel_stud_count = formData.wheel_stud_count ? parseInt(formData.wheel_stud_count) : null;
+        productData.wheel_stud_type = formData.wheel_stud_type || null;
       }
 
       if (product) {
@@ -934,6 +953,38 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                         className="px-3 py-2 border border-gray-300 rounded-md bg-white"
                       />
                     </div>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Number of Studs</label>
+                        <input
+                          type="number"
+                          placeholder="4, 5, 6..."
+                          value={formData.wheel_stud_count}
+                          onChange={(e) =>
+                            setFormData({ ...formData, wheel_stud_count: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                          min="3"
+                          max="8"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Stud Type</label>
+                        <select
+                          value={formData.wheel_stud_type}
+                          onChange={(e) =>
+                            setFormData({ ...formData, wheel_stud_type: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                        >
+                          <option value="">-- Select Type --</option>
+                          <option value="Short Stud">Short Stud</option>
+                          <option value="Long Stud">Long Stud</option>
+                          <option value="Multi Stud">Multi Stud</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -1020,19 +1071,57 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                     />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Center Bore (mm)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.wheel_center_bore}
-                    onChange={(e) =>
-                      setFormData({ ...formData, wheel_center_bore: e.target.value })
-                    }
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="67.1"
-                  />
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Center Bore (mm)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.wheel_center_bore}
+                      onChange={(e) =>
+                        setFormData({ ...formData, wheel_center_bore: e.target.value })
+                      }
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder="67.1"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Number of Studs *
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.wheel_stud_count}
+                      onChange={(e) =>
+                        setFormData({ ...formData, wheel_stud_count: e.target.value })
+                      }
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder="4, 5, 6..."
+                      min="3"
+                      max="8"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Stud Type *
+                    </label>
+                    <select
+                      value={formData.wheel_stud_type}
+                      onChange={(e) =>
+                        setFormData({ ...formData, wheel_stud_type: e.target.value })
+                      }
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                    >
+                      <option value="">-- Select Type --</option>
+                      <option value="Short Stud">Short Stud</option>
+                      <option value="Long Stud">Long Stud</option>
+                      <option value="Multi Stud">Multi Stud</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
                 </div>
                 {formData.size_display && (
                   <div className="bg-purple-50 p-3 rounded mt-3">

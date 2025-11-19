@@ -120,6 +120,8 @@ function runMigrations(): void {
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_pcd TEXT`);
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_offset TEXT`);
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_center_bore TEXT`);
+      db!.exec(`ALTER TABLE products ADD COLUMN wheel_stud_count INTEGER`);
+      db!.exec(`ALTER TABLE products ADD COLUMN wheel_stud_type TEXT`);
       db!.exec(`ALTER TABLE products ADD COLUMN size_display TEXT`);
     } catch (e) {
       // Columns already exist, ignore
@@ -205,10 +207,20 @@ function runMigrations(): void {
         pcd TEXT,
         offset TEXT,
         center_bore TEXT,
+        stud_count INTEGER,
+        stud_type TEXT,
         size_display TEXT NOT NULL,
-        UNIQUE(diameter, width, pcd, offset, center_bore)
+        UNIQUE(diameter, width, pcd, offset, center_bore, stud_count, stud_type)
       )
     `);
+    
+    // Add stud columns to existing wheel_sizes table if they don't exist
+    try {
+      db!.exec(`ALTER TABLE wheel_sizes ADD COLUMN stud_count INTEGER`);
+      db!.exec(`ALTER TABLE wheel_sizes ADD COLUMN stud_type TEXT`);
+    } catch (e) {
+      // Columns already exist, ignore
+    }
 
     // Insert default brands
     try {

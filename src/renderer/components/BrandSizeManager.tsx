@@ -22,6 +22,8 @@ interface WheelSize {
   pcd?: string;
   offset?: string;
   center_bore?: string;
+  stud_count?: number;
+  stud_type?: string;
   size_display: string;
 }
 
@@ -55,6 +57,8 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
     pcd: '',
     offset: '',
     center_bore: '',
+    stud_count: '',
+    stud_type: '',
   });
 
   useEffect(() => {
@@ -149,8 +153,10 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
         pcd: newWheelSize.pcd || null,
         offset: newWheelSize.offset || null,
         center_bore: newWheelSize.center_bore || null,
+        stud_count: newWheelSize.stud_count ? parseInt(newWheelSize.stud_count) : null,
+        stud_type: newWheelSize.stud_type || null,
       });
-      setNewWheelSize({ diameter: '', width: '', pcd: '', offset: '', center_bore: '' });
+      setNewWheelSize({ diameter: '', width: '', pcd: '', offset: '', center_bore: '', stud_count: '', stud_type: '' });
       loadAll();
       alert('Wheel size added successfully!');
     } catch (error: any) {
@@ -170,8 +176,8 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Manage Brands & Sizes</h2>
           <button
@@ -336,10 +342,10 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
             {/* Wheel Sizes Tab */}
             {activeTab === 'wheels' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <input
                     type="number"
-                    placeholder="Diameter"
+                    placeholder="Diameter *"
                     value={newWheelSize.diameter}
                     onChange={(e) =>
                       setNewWheelSize({ ...newWheelSize, diameter: e.target.value })
@@ -349,13 +355,39 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
                   <input
                     type="number"
                     step="0.5"
-                    placeholder="Width"
+                    placeholder="Width *"
                     value={newWheelSize.width}
                     onChange={(e) =>
                       setNewWheelSize({ ...newWheelSize, width: e.target.value })
                     }
                     className="px-3 py-2 border border-gray-300 rounded"
                   />
+                  <input
+                    type="number"
+                    placeholder="Number of Studs"
+                    value={newWheelSize.stud_count}
+                    onChange={(e) =>
+                      setNewWheelSize({ ...newWheelSize, stud_count: e.target.value })
+                    }
+                    className="px-3 py-2 border border-gray-300 rounded"
+                    min="3"
+                    max="8"
+                  />
+                  <select
+                    value={newWheelSize.stud_type}
+                    onChange={(e) =>
+                      setNewWheelSize({ ...newWheelSize, stud_type: e.target.value })
+                    }
+                    className="px-3 py-2 border border-gray-300 rounded bg-white"
+                  >
+                    <option value="">Stud Type</option>
+                    <option value="Short Stud">Short Stud</option>
+                    <option value="Long Stud">Long Stud</option>
+                    <option value="Multi Stud">Multi Stud</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
                   <input
                     type="text"
                     placeholder="PCD (optional)"
@@ -390,16 +422,25 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
                 >
                   Add Wheel Size
                 </button>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-96 overflow-y-auto">
                   {wheelSizes.map((size) => (
                     <div
                       key={size.id}
-                      className="flex items-center justify-between p-2 bg-gray-50 rounded border"
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded border"
                     >
-                      <span className="text-sm font-medium">{size.size_display}</span>
+                      <div className="flex-1">
+                        <span className="text-sm font-medium block">{size.size_display}</span>
+                        {(size.stud_count || size.stud_type) && (
+                          <span className="text-xs text-gray-500">
+                            {size.stud_count && `${size.stud_count} Stud`}
+                            {size.stud_count && size.stud_type && ' • '}
+                            {size.stud_type}
+                          </span>
+                        )}
+                      </div>
                       <button
                         onClick={() => handleDeleteWheelSize(size.id)}
-                        className="text-red-600 hover:text-red-800 text-sm"
+                        className="text-red-600 hover:text-red-800 text-sm ml-2"
                       >
                         ×
                       </button>

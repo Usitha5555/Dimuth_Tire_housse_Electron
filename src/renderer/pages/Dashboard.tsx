@@ -67,14 +67,68 @@ const Dashboard = () => {
         window.electronAPI.invoices.getAll(),
       ]);
 
-      const today = new Date().toISOString().split('T')[0];
-      const todayInvoices = invoices.filter(
-        (inv: any) => inv.created_at?.split('T')[0] === today
-      );
+      // Get today's date - set to start of day in local timezone
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      // Filter invoices created today using date comparison
+      const todayInvoices = invoices.filter((inv: any) => {
+        if (!inv.created_at) return false;
+        
+        try {
+          // Parse the invoice date - SQLite returns as string
+          const invDate = new Date(inv.created_at);
+          
+          // Check if date is valid
+          if (isNaN(invDate.getTime())) return false;
+          
+          // Normalize invoice date to start of day for comparison
+          const invDateNormalized = new Date(invDate);
+          invDateNormalized.setHours(0, 0, 0, 0);
+          
+          // Compare dates (ignoring time)
+          return invDateNormalized.getTime() === today.getTime();
+        } catch (e) {
+          console.error('Error parsing invoice date:', inv.created_at, e);
+          return false;
+        }
+      });
+      
       const todaySales = todayInvoices.reduce(
         (sum: number, inv: any) => sum + (parseFloat(inv.total_amount) || 0),
         0
       );
+      
+      // Debug logging
+      const todayDateStr = today.toISOString().split('T')[0];
+      console.log('=== Dashboard Date Debug ===');
+      console.log('Today date:', todayDateStr);
+      console.log('Today normalized timestamp:', today.getTime());
+      console.log('Total invoices:', invoices.length);
+      invoices.forEach((inv: any) => {
+        if (inv.created_at) {
+          try {
+            const invDate = new Date(inv.created_at);
+            const invDateNormalized = new Date(invDate);
+            invDateNormalized.setHours(0, 0, 0, 0);
+            console.log('Invoice:', {
+              id: inv.id,
+              invoice_number: inv.invoice_number,
+              created_at: inv.created_at,
+              parsedDate: invDate.toISOString(),
+              normalizedTimestamp: invDateNormalized.getTime(),
+              total_amount: inv.total_amount,
+              isToday: invDateNormalized.getTime() === today.getTime()
+            });
+          } catch (e) {
+            console.error('Error processing invoice:', inv.id, e);
+          }
+        }
+      });
+      console.log('Today invoices found:', todayInvoices.length);
+      console.log('Today sales:', todaySales);
 
       // Calculate weekly sales (last 7 days)
       const weekAgo = new Date();
@@ -110,29 +164,49 @@ const Dashboard = () => {
 
       // Prepare sales data for last 7 days chart
       const salesByDate: { [key: string]: { sales: number; invoices: number } } = {};
+      
+      // Initialize last 7 days with zero values
       for (let i = 6; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
+        date.setHours(0, 0, 0, 0);
         const dateStr = date.toISOString().split('T')[0];
         salesByDate[dateStr] = { sales: 0, invoices: 0 };
       }
 
+      // Populate with actual invoice data
       invoices.forEach((inv: any) => {
         if (!inv.created_at) return;
-        const invDate = inv.created_at.split('T')[0];
-        if (salesByDate[invDate]) {
-          salesByDate[invDate].sales += parseFloat(inv.total_amount) || 0;
-          salesByDate[invDate].invoices += 1;
+        
+        try {
+          // Parse invoice date
+          const invDate = new Date(inv.created_at);
+          if (isNaN(invDate.getTime())) return;
+          
+          // Normalize to start of day
+          invDate.setHours(0, 0, 0, 0);
+          const invDateStr = invDate.toISOString().split('T')[0];
+          
+          // Add to sales data if it's within the last 7 days
+          if (salesByDate[invDateStr]) {
+            salesByDate[invDateStr].sales += parseFloat(inv.total_amount) || 0;
+            salesByDate[invDateStr].invoices += 1;
+          }
+        } catch (e) {
+          console.error('Error processing invoice for chart:', inv.id, e);
         }
       });
 
+      // Convert to chart data format, sorted by date
       const chartData: SalesData[] = Object.entries(salesByDate)
+        .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
         .map(([date, data]) => ({
           date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          sales: Number(data.sales.toFixed(2)),
-          invoices: data.invoices,
-        }))
-        .filter(item => !isNaN(item.sales) && !isNaN(item.invoices));
+          sales: Number((data.sales || 0).toFixed(2)),
+          invoices: data.invoices || 0,
+        }));
+      
+      console.log('Chart data prepared:', chartData);
 
       // Product type distribution
       const typeCounts: { [key: string]: number } = {};

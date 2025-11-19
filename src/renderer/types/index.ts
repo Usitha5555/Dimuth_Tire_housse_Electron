@@ -23,6 +23,8 @@ export interface Product {
   wheel_pcd?: string;
   wheel_offset?: string;
   wheel_center_bore?: string;
+  wheel_stud_count?: number;
+  wheel_stud_type?: string;
   // Combined size display
   size_display?: string;
   image_path?: string;
