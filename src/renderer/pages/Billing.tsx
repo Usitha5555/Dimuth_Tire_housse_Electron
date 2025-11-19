@@ -215,6 +215,11 @@ const Billing = () => {
                         {product.size_display}
                       </div>
                     )}
+                    {product.product_type === 'alloy_wheel' && product.wheel_stud_count && product.wheel_stud_type && (
+                      <div className="text-xs font-semibold text-purple-700 mt-1">
+                        🔩 {product.wheel_stud_count} Stud • {product.wheel_stud_type}
+                      </div>
+                    )}
                     <div className="text-sm text-gray-500 mt-1">
                       Rs. {product.price.toFixed(2)}
                     </div>

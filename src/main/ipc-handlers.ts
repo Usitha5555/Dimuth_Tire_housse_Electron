@@ -19,37 +19,42 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('products:create', async (_, product: any) => {
     const db = getDatabase();
-    const stmt = db.prepare(`
-      INSERT INTO products (name, description, sku, price, cost_price, stock_quantity, low_stock_threshold, category,
-                           product_type, tire_width, tire_aspect_ratio, tire_diameter, tire_load_index, tire_speed_rating,
-                           wheel_diameter, wheel_width, wheel_pcd, wheel_offset, wheel_center_bore, wheel_stud_count, wheel_stud_type, size_display)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const result = stmt.run(
-      product.name,
-      product.description || null,
-      product.sku || null,
-      product.price || 0,
-      product.cost_price || 0,
-      product.stock_quantity || 0,
-      product.low_stock_threshold || 10,
-      product.category || null,
-      product.product_type || 'general',
-      product.tire_width || null,
-      product.tire_aspect_ratio || null,
-      product.tire_diameter || null,
-      product.tire_load_index || null,
-      product.tire_speed_rating || null,
-      product.wheel_diameter || null,
-      product.wheel_width || null,
-      product.wheel_pcd || null,
-      product.wheel_offset || null,
-      product.wheel_center_bore || null,
-      product.wheel_stud_count || null,
-      product.wheel_stud_type || null,
-      product.size_display || null
-    );
-    return { id: result.lastInsertRowid, ...product };
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO products (name, description, sku, price, cost_price, stock_quantity, low_stock_threshold, category,
+                             product_type, tire_width, tire_aspect_ratio, tire_diameter, tire_load_index, tire_speed_rating,
+                             wheel_diameter, wheel_width, wheel_pcd, wheel_offset, wheel_center_bore, wheel_stud_count, wheel_stud_type, size_display)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const result = stmt.run(
+        product.name,
+        product.description || null,
+        product.sku || null,
+        product.price || 0,
+        product.cost_price || 0,
+        product.stock_quantity || 0,
+        product.low_stock_threshold || 10,
+        product.category || null,
+        product.product_type || 'general',
+        product.tire_width || null,
+        product.tire_aspect_ratio || null,
+        product.tire_diameter || null,
+        product.tire_load_index || null,
+        product.tire_speed_rating || null,
+        product.wheel_diameter || null,
+        product.wheel_width || null,
+        product.wheel_pcd || null,
+        product.wheel_offset || null,
+        product.wheel_center_bore || null,
+        product.wheel_stud_count || null,
+        product.wheel_stud_type || null,
+        product.size_display || null
+      );
+      return { id: result.lastInsertRowid, ...product };
+    } catch (error: any) {
+      console.error('Error creating product:', error);
+      throw new Error(error.message || 'Failed to create product');
+    }
   });
 
   ipcMain.handle('products:update', async (_, id: number, product: any) => {
@@ -93,9 +98,78 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('products:delete', async (_, id: number) => {
     const db = getDatabase();
-    const stmt = db.prepare('DELETE FROM products WHERE id = ?');
-    stmt.run(id);
-    return { success: true };
+    try {
+      // Check if product is used in any invoices
+      const invoiceItemsCheck = db.prepare('SELECT COUNT(*) as count FROM invoice_items WHERE product_id = ?').get(id) as { count: number };
+      
+      if (invoiceItemsCheck.count > 0) {
+        // Product is used in invoices - delete related records first
+        // Delete stock movements
+        db.prepare('DELETE FROM stock_movements WHERE product_id = ?').run(id);
+        // Delete invoice items (they reference the product)
+        db.prepare('DELETE FROM invoice_items WHERE product_id = ?').run(id);
+      }
+      
+      // Delete stock movements if any exist
+      db.prepare('DELETE FROM stock_movements WHERE product_id = ?').run(id);
+      
+      // Now delete the product
+      const stmt = db.prepare('DELETE FROM products WHERE id = ?');
+      const result = stmt.run(id);
+      
+      if (result.changes === 0) {
+        throw new Error('Product not found');
+      }
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error deleting product:', error);
+      throw new Error(error.message || 'Failed to delete product. It may be referenced in invoices.');
+    }
+  });
+
+  ipcMain.handle('products:deleteAll', async () => {
+    const db = getDatabase();
+    try {
+      // Delete all related records first
+      db.prepare('DELETE FROM stock_movements').run();
+      db.prepare('DELETE FROM invoice_items').run();
+      
+      // Delete all products
+      const result = db.prepare('DELETE FROM products').run();
+      
+      return { success: true, deleted: result.changes };
+    } catch (error: any) {
+      console.error('Error deleting all products:', error);
+      throw new Error(error.message || 'Failed to delete all products');
+    }
+  });
+
+  ipcMain.handle('products:deleteByName', async (_, name: string) => {
+    const db = getDatabase();
+    try {
+      // Find products by name (partial match)
+      const products = db.prepare('SELECT id FROM products WHERE name LIKE ?').all(`%${name}%`) as { id: number }[];
+      
+      if (products.length === 0) {
+        throw new Error(`No products found matching "${name}"`);
+      }
+
+      let deleted = 0;
+      for (const product of products) {
+        // Delete related records
+        db.prepare('DELETE FROM stock_movements WHERE product_id = ?').run(product.id);
+        db.prepare('DELETE FROM invoice_items WHERE product_id = ?').run(product.id);
+        // Delete the product
+        db.prepare('DELETE FROM products WHERE id = ?').run(product.id);
+        deleted++;
+      }
+      
+      return { success: true, deleted, products: products.map(p => p.id) };
+    } catch (error: any) {
+      console.error('Error deleting products by name:', error);
+      throw new Error(error.message || 'Failed to delete products');
+    }
   });
 
   ipcMain.handle('products:getLowStock', async () => {
@@ -199,13 +273,18 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('wheelSizes:create', async (_, sizeData: any) => {
     const db = getDatabase();
-    // Build size display with stud info if available
+    // Build size display - stud info is essential for wheel sizes
     let sizeDisplay = sizeData.size_display;
     if (!sizeDisplay) {
       sizeDisplay = `${sizeData.diameter}x${sizeData.width}`;
       if (sizeData.pcd) sizeDisplay += ` PCD:${sizeData.pcd}`;
-      if (sizeData.stud_count) sizeDisplay += ` ${sizeData.stud_count} Stud`;
-      if (sizeData.stud_type) sizeDisplay += ` (${sizeData.stud_type})`;
+      // Always include stud info if provided (essential field)
+      if (sizeData.stud_count) {
+        sizeDisplay += ` ${sizeData.stud_count} Stud`;
+      }
+      if (sizeData.stud_type) {
+        sizeDisplay += ` (${sizeData.stud_type})`;
+      }
     }
     
     try {
@@ -247,11 +326,20 @@ export function setupIpcHandlers(): void {
       // Generate invoice number
       const invoiceNumber = `INV-${Date.now()}`;
       
+      // Get current local date/time as ISO string (without timezone conversion)
+      const now = new Date();
+      const localDateTime = now.getFullYear() + '-' + 
+        String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+        String(now.getDate()).padStart(2, '0') + ' ' +
+        String(now.getHours()).padStart(2, '0') + ':' +
+        String(now.getMinutes()).padStart(2, '0') + ':' +
+        String(now.getSeconds()).padStart(2, '0');
+      
       // Create invoice
       const invoiceStmt = db.prepare(`
         INSERT INTO invoices (invoice_number, customer_name, customer_phone, customer_email,
-                             subtotal, tax_amount, discount_amount, total_amount, payment_method)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             subtotal, tax_amount, discount_amount, total_amount, payment_method, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       
       const invoiceResult = invoiceStmt.run(
@@ -263,7 +351,8 @@ export function setupIpcHandlers(): void {
         invoiceData.tax_amount || 0,
         invoiceData.discount_amount || 0,
         invoiceData.total_amount || 0,
-        invoiceData.payment_method || 'cash'
+        invoiceData.payment_method || 'cash',
+        localDateTime
       );
       
       const invoiceId = invoiceResult.lastInsertRowid as number;
@@ -339,6 +428,8 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('reports:dailySales', async (_, date: string) => {
     const db = getDatabase();
+    // Use string comparison to extract date part (first 10 characters: YYYY-MM-DD)
+    // This avoids timezone issues with SQLite's DATE() function
     const sales = db.prepare(`
       SELECT 
         COUNT(*) as total_invoices,
@@ -347,7 +438,7 @@ export function setupIpcHandlers(): void {
         SUM(tax_amount) as total_tax,
         SUM(discount_amount) as total_discount
       FROM invoices
-      WHERE DATE(created_at) = ?
+      WHERE SUBSTR(created_at, 1, 10) = ?
     `).get(date);
     
     const topProducts = db.prepare(`
@@ -357,7 +448,7 @@ export function setupIpcHandlers(): void {
         SUM(ii.total_price) as total_revenue
       FROM invoice_items ii
       INNER JOIN invoices i ON ii.invoice_id = i.id
-      WHERE DATE(i.created_at) = ?
+      WHERE SUBSTR(i.created_at, 1, 10) = ?
       GROUP BY ii.product_id, ii.product_name
       ORDER BY total_revenue DESC
       LIMIT 10

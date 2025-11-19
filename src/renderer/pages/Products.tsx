@@ -29,16 +29,17 @@ const Products = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this product?')) {
+    if (confirm('Are you sure you want to delete this product? This will also remove it from any invoices.')) {
       try {
         await window.electronAPI.products.delete(id);
         loadProducts();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error deleting product:', error);
-        alert('Failed to delete product');
+        alert(error?.message || 'Failed to delete product');
       }
     }
   };
+
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
@@ -148,6 +149,11 @@ const Products = () => {
                     {product.size_display && (
                       <div className="text-xs text-gray-600 mt-1">
                         {product.size_display}
+                      </div>
+                    )}
+                    {product.product_type === 'alloy_wheel' && product.wheel_stud_count && product.wheel_stud_type && (
+                      <div className="text-xs font-semibold text-purple-700 mt-1">
+                        🔩 {product.wheel_stud_count} Stud • {product.wheel_stud_type}
                       </div>
                     )}
                   </div>
@@ -479,8 +485,13 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
       if (formData.wheel_diameter && formData.wheel_width) {
         let display = `${formData.wheel_diameter}x${formData.wheel_width}`;
         if (formData.wheel_pcd) display += ` PCD:${formData.wheel_pcd}`;
-        if (formData.wheel_stud_count) display += ` ${formData.wheel_stud_count} Stud`;
-        if (formData.wheel_stud_type) display += ` (${formData.wheel_stud_type})`;
+        // Stud info is essential - always include if available
+        if (formData.wheel_stud_count) {
+          display += ` ${formData.wheel_stud_count} Stud`;
+        }
+        if (formData.wheel_stud_type) {
+          display += ` (${formData.wheel_stud_type})`;
+        }
         setFormData(prev => ({ ...prev, size_display: display }));
       }
     }
@@ -498,17 +509,31 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Validate required fields
+      if (!formData.name || formData.name.trim() === '') {
+        alert('Product name is required');
+        return;
+      }
+      if (!formData.price || parseFloat(formData.price) <= 0) {
+        alert('Product price is required and must be greater than 0');
+        return;
+      }
+      if (!formData.stock_quantity || parseInt(formData.stock_quantity) < 0) {
+        alert('Stock quantity is required');
+        return;
+      }
+
       const productData: any = {
-        name: formData.name,
-        description: formData.description || null,
-        sku: formData.sku || null,
+        name: formData.name.trim(),
+        description: formData.description?.trim() || null,
+        sku: formData.sku?.trim() || null,
         price: parseFloat(formData.price) || 0,
         cost_price: parseFloat(formData.cost_price) || 0,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         low_stock_threshold: parseInt(formData.low_stock_threshold) || 10,
-        category: formData.category || null,
+        category: formData.category?.trim() || null,
         product_type: formData.product_type,
-        size_display: formData.size_display || null,
+        size_display: formData.size_display?.trim() || null,
       };
 
       // Add tire-specific fields
@@ -522,13 +547,24 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
 
       // Add wheel-specific fields
       if (formData.product_type === 'alloy_wheel') {
+        // Validate required stud fields only for new products
+        if (!product && (!formData.wheel_stud_count || !formData.wheel_stud_type)) {
+          alert('Number of Studs and Stud Type are required for alloy wheels');
+          return;
+        }
         productData.wheel_diameter = formData.wheel_diameter ? parseInt(formData.wheel_diameter) : null;
         productData.wheel_width = formData.wheel_width ? parseFloat(formData.wheel_width) : null;
         productData.wheel_pcd = formData.wheel_pcd || null;
         productData.wheel_offset = formData.wheel_offset || null;
         productData.wheel_center_bore = formData.wheel_center_bore || null;
-        productData.wheel_stud_count = formData.wheel_stud_count ? parseInt(formData.wheel_stud_count) : null;
-        productData.wheel_stud_type = formData.wheel_stud_type || null;
+        // Only set stud fields if they have values (for editing existing products)
+        if (formData.wheel_stud_count && formData.wheel_stud_type) {
+          productData.wheel_stud_count = parseInt(formData.wheel_stud_count);
+          productData.wheel_stud_type = formData.wheel_stud_type;
+        } else {
+          productData.wheel_stud_count = null;
+          productData.wheel_stud_type = null;
+        }
       }
 
       if (product) {
@@ -537,15 +573,16 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
         await window.electronAPI.products.create(productData);
       }
       onSave();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error);
-      alert('Failed to save product');
+      const errorMessage = error?.message || error?.toString() || 'Unknown error occurred';
+      alert(`Failed to save product: ${errorMessage}`);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
         <h2 className="text-xl font-bold mb-4">
           {product ? 'Edit Product' : 'Add Product'}
         </h2>
@@ -956,17 +993,18 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                     <div className="grid grid-cols-2 gap-2 mb-3">
                       <div>
                         <label className="block text-xs font-semibold text-gray-700 mb-1">Number of Studs</label>
-                        <input
-                          type="number"
-                          placeholder="4, 5, 6..."
-                          value={formData.wheel_stud_count}
-                          onChange={(e) =>
-                            setFormData({ ...formData, wheel_stud_count: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
-                          min="3"
-                          max="8"
-                        />
+                    <input
+                      type="number"
+                      placeholder="4, 5, 6..."
+                      value={formData.wheel_stud_count}
+                      onChange={(e) =>
+                        setFormData({ ...formData, wheel_stud_count: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                      min="3"
+                      max="8"
+                      required
+                    />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-gray-700 mb-1">Stud Type</label>
@@ -976,6 +1014,7 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                             setFormData({ ...formData, wheel_stud_type: e.target.value })
                           }
                           className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                          required
                         >
                           <option value="">-- Select Type --</option>
                           <option value="Short Stud">Short Stud</option>
@@ -1102,6 +1141,7 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                       placeholder="4, 5, 6..."
                       min="3"
                       max="8"
+                      required
                     />
                   </div>
                   <div>
@@ -1114,6 +1154,7 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                         setFormData({ ...formData, wheel_stud_type: e.target.value })
                       }
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                      required
                     >
                       <option value="">-- Select Type --</option>
                       <option value="Short Stud">Short Stud</option>

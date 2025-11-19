@@ -146,6 +146,10 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
       alert('Please fill in diameter and width');
       return;
     }
+    if (!newWheelSize.stud_count || !newWheelSize.stud_type) {
+      alert('Number of Studs and Stud Type are required for wheel sizes');
+      return;
+    }
     try {
       await window.electronAPI.wheelSizes.create({
         diameter: parseInt(newWheelSize.diameter),
@@ -364,7 +368,7 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
                   />
                   <input
                     type="number"
-                    placeholder="Number of Studs"
+                    placeholder="Number of Studs *"
                     value={newWheelSize.stud_count}
                     onChange={(e) =>
                       setNewWheelSize({ ...newWheelSize, stud_count: e.target.value })
@@ -372,6 +376,7 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
                     className="px-3 py-2 border border-gray-300 rounded"
                     min="3"
                     max="8"
+                    required
                   />
                   <select
                     value={newWheelSize.stud_type}
@@ -379,8 +384,9 @@ const BrandSizeManager = ({ onClose }: BrandSizeManagerProps) => {
                       setNewWheelSize({ ...newWheelSize, stud_type: e.target.value })
                     }
                     className="px-3 py-2 border border-gray-300 rounded bg-white"
+                    required
                   >
-                    <option value="">Stud Type</option>
+                    <option value="">Stud Type *</option>
                     <option value="Short Stud">Short Stud</option>
                     <option value="Long Stud">Long Stud</option>
                     <option value="Multi Stud">Multi Stud</option>

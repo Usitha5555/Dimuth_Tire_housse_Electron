@@ -58,7 +58,14 @@ export function generateReceiptPDF(invoice: InvoiceData): void {
   doc.setFont('helvetica', 'bold');
   doc.text('Date:', margin, yPos);
   doc.setFont('helvetica', 'normal');
-  const formattedDate = format(new Date(invoice.created_at), 'dd MMM yyyy, hh:mm a');
+  // Extract date and time directly from local datetime string (format: "YYYY-MM-DD HH:MM:SS")
+  // This avoids timezone conversion issues
+  const dateTimeStr = invoice.created_at.toString();
+  const [datePart, timePart] = dateTimeStr.split(' ');
+  const [year, month, day] = datePart.split('-');
+  const [hour, minute] = timePart ? timePart.split(':') : ['00', '00'];
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+  const formattedDate = format(date, 'dd MMM yyyy, hh:mm a');
   doc.text(formattedDate, margin + 50, yPos);
   yPos += 8;
 
@@ -200,7 +207,14 @@ export function printReceipt(invoice: InvoiceData): void {
     return;
   }
 
-  const formattedDate = format(new Date(invoice.created_at), 'dd MMM yyyy, hh:mm a');
+  // Extract date and time directly from local datetime string (format: "YYYY-MM-DD HH:MM:SS")
+  // This avoids timezone conversion issues
+  const dateTimeStr = invoice.created_at.toString();
+  const [datePart, timePart] = dateTimeStr.split(' ');
+  const [year, month, day] = datePart.split('-');
+  const [hour, minute] = timePart ? timePart.split(':') : ['00', '00'];
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+  const formattedDate = format(date, 'dd MMM yyyy, hh:mm a');
 
   printWindow.document.write(`
     <!DOCTYPE html>

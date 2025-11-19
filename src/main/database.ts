@@ -94,6 +94,8 @@ function runMigrations(): void {
         wheel_pcd TEXT, -- e.g., 5x114.3
         wheel_offset TEXT, -- e.g., ET35
         wheel_center_bore TEXT, -- e.g., 67.1
+        wheel_stud_count INTEGER, -- e.g., 4, 5, 6
+        wheel_stud_type TEXT, -- e.g., "Short Stud", "Long Stud", "Multi Stud"
         -- Combined size display (for easy search/filter)
         size_display TEXT, -- e.g., "205/55R16" for tires, "16x7" for wheels
         image_path TEXT,
@@ -109,23 +111,48 @@ function runMigrations(): void {
       // Column already exists, ignore
     }
     
+    // Add tire columns
     try {
       db!.exec(`ALTER TABLE products ADD COLUMN tire_width INTEGER`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN tire_aspect_ratio INTEGER`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN tire_diameter INTEGER`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN tire_load_index TEXT`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN tire_speed_rating TEXT`);
+    } catch (e) {}
+    
+    // Add wheel columns
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_diameter INTEGER`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_width REAL`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_pcd TEXT`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_offset TEXT`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_center_bore TEXT`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_stud_count INTEGER`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN wheel_stud_type TEXT`);
+    } catch (e) {}
+    try {
       db!.exec(`ALTER TABLE products ADD COLUMN size_display TEXT`);
-    } catch (e) {
-      // Columns already exist, ignore
-    }
+    } catch (e) {}
 
     // Create invoices table
     db!.exec(`
@@ -268,29 +295,12 @@ function runMigrations(): void {
       // Ignore if already exists
     }
 
-    // Insert common wheel sizes
+    // Remove default wheel sizes that don't have stud information
+    // Users must add wheel sizes with stud information through the UI
     try {
-      db!.exec(`
-        INSERT OR IGNORE INTO wheel_sizes (diameter, width, size_display) VALUES
-        (13, 5.0, '13x5'),
-        (13, 5.5, '13x5.5'),
-        (14, 5.5, '14x5.5'),
-        (14, 6.0, '14x6'),
-        (15, 6.0, '15x6'),
-        (15, 6.5, '15x6.5'),
-        (15, 7.0, '15x7'),
-        (16, 6.5, '16x6.5'),
-        (16, 7.0, '16x7'),
-        (16, 7.5, '16x7.5'),
-        (17, 7.0, '17x7'),
-        (17, 7.5, '17x7.5'),
-        (17, 8.0, '17x8'),
-        (18, 7.5, '18x7.5'),
-        (18, 8.0, '18x8'),
-        (18, 8.5, '18x8.5')
-      `);
+      db!.exec(`DELETE FROM wheel_sizes WHERE stud_count IS NULL OR stud_type IS NULL`);
     } catch (e) {
-      // Ignore if already exists
+      // Ignore if table doesn't exist or no rows to delete
     }
 
     // Create indexes for better query performance

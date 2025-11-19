@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (product: any) => ipcRenderer.invoke('products:create', product),
     update: (id: number, product: any) => ipcRenderer.invoke('products:update', id, product),
     delete: (id: number) => ipcRenderer.invoke('products:delete', id),
+    deleteAll: () => ipcRenderer.invoke('products:deleteAll'),
+    deleteByName: (name: string) => ipcRenderer.invoke('products:deleteByName', name),
     getLowStock: () => ipcRenderer.invoke('products:getLowStock'),
     getByType: (type: string) => ipcRenderer.invoke('products:getByType', type),
     getBySize: (size: string) => ipcRenderer.invoke('products:getBySize', size),

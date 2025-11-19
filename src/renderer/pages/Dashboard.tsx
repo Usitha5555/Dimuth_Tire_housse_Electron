@@ -67,29 +67,24 @@ const Dashboard = () => {
         window.electronAPI.invoices.getAll(),
       ]);
 
-      // Get today's date - set to start of day in local timezone
+      // Get today's date in local timezone (format: YYYY-MM-DD)
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(today);
-      todayEnd.setHours(23, 59, 59, 999);
+      const todayDateStr = 
+        today.getFullYear() + '-' +
+        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+        String(today.getDate()).padStart(2, '0');
       
       // Filter invoices created today using date comparison
       const todayInvoices = invoices.filter((inv: any) => {
         if (!inv.created_at) return false;
         
         try {
-          // Parse the invoice date - SQLite returns as string
-          const invDate = new Date(inv.created_at);
+          // Extract date part directly from local datetime string (format: "YYYY-MM-DD HH:MM:SS")
+          // This avoids timezone conversion issues
+          const invDateStr = inv.created_at.toString().split(' ')[0];
           
-          // Check if date is valid
-          if (isNaN(invDate.getTime())) return false;
-          
-          // Normalize invoice date to start of day for comparison
-          const invDateNormalized = new Date(invDate);
-          invDateNormalized.setHours(0, 0, 0, 0);
-          
-          // Compare dates (ignoring time)
-          return invDateNormalized.getTime() === today.getTime();
+          // Compare date strings directly
+          return invDateStr === todayDateStr;
         } catch (e) {
           console.error('Error parsing invoice date:', inv.created_at, e);
           return false;
@@ -102,25 +97,20 @@ const Dashboard = () => {
       );
       
       // Debug logging
-      const todayDateStr = today.toISOString().split('T')[0];
       console.log('=== Dashboard Date Debug ===');
       console.log('Today date:', todayDateStr);
-      console.log('Today normalized timestamp:', today.getTime());
       console.log('Total invoices:', invoices.length);
       invoices.forEach((inv: any) => {
         if (inv.created_at) {
           try {
-            const invDate = new Date(inv.created_at);
-            const invDateNormalized = new Date(invDate);
-            invDateNormalized.setHours(0, 0, 0, 0);
+            const invDateStr = inv.created_at.toString().split(' ')[0];
             console.log('Invoice:', {
               id: inv.id,
               invoice_number: inv.invoice_number,
               created_at: inv.created_at,
-              parsedDate: invDate.toISOString(),
-              normalizedTimestamp: invDateNormalized.getTime(),
+              dateStr: invDateStr,
               total_amount: inv.total_amount,
-              isToday: invDateNormalized.getTime() === today.getTime()
+              isToday: invDateStr === todayDateStr
             });
           } catch (e) {
             console.error('Error processing invoice:', inv.id, e);
@@ -133,10 +123,19 @@ const Dashboard = () => {
       // Calculate weekly sales (last 7 days)
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
+      const weekAgoStr = 
+        weekAgo.getFullYear() + '-' +
+        String(weekAgo.getMonth() + 1).padStart(2, '0') + '-' +
+        String(weekAgo.getDate()).padStart(2, '0');
       const thisWeekInvoices = invoices.filter((inv: any) => {
         if (!inv.created_at) return false;
-        const invDate = new Date(inv.created_at);
-        return invDate >= weekAgo && !isNaN(invDate.getTime());
+        try {
+          // Extract date part directly from local datetime string
+          const invDateStr = inv.created_at.toString().split(' ')[0];
+          return invDateStr >= weekAgoStr;
+        } catch (e) {
+          return false;
+        }
       });
       const thisWeekSales = thisWeekInvoices.reduce(
         (sum: number, inv: any) => sum + (parseFloat(inv.total_amount) || 0),
@@ -146,10 +145,19 @@ const Dashboard = () => {
       // Calculate monthly sales
       const monthAgo = new Date();
       monthAgo.setMonth(monthAgo.getMonth() - 1);
+      const monthAgoStr = 
+        monthAgo.getFullYear() + '-' +
+        String(monthAgo.getMonth() + 1).padStart(2, '0') + '-' +
+        String(monthAgo.getDate()).padStart(2, '0');
       const thisMonthInvoices = invoices.filter((inv: any) => {
         if (!inv.created_at) return false;
-        const invDate = new Date(inv.created_at);
-        return invDate >= monthAgo && !isNaN(invDate.getTime());
+        try {
+          // Extract date part directly from local datetime string
+          const invDateStr = inv.created_at.toString().split(' ')[0];
+          return invDateStr >= monthAgoStr;
+        } catch (e) {
+          return false;
+        }
       });
       const thisMonthSales = thisMonthInvoices.reduce(
         (sum: number, inv: any) => sum + (parseFloat(inv.total_amount) || 0),
@@ -169,8 +177,10 @@ const Dashboard = () => {
       for (let i = 6; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
-        date.setHours(0, 0, 0, 0);
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = 
+          date.getFullYear() + '-' +
+          String(date.getMonth() + 1).padStart(2, '0') + '-' +
+          String(date.getDate()).padStart(2, '0');
         salesByDate[dateStr] = { sales: 0, invoices: 0 };
       }
 
@@ -179,13 +189,9 @@ const Dashboard = () => {
         if (!inv.created_at) return;
         
         try {
-          // Parse invoice date
-          const invDate = new Date(inv.created_at);
-          if (isNaN(invDate.getTime())) return;
-          
-          // Normalize to start of day
-          invDate.setHours(0, 0, 0, 0);
-          const invDateStr = invDate.toISOString().split('T')[0];
+          // Extract date part directly from local datetime string (format: "YYYY-MM-DD HH:MM:SS")
+          // This avoids timezone conversion issues
+          const invDateStr = inv.created_at.toString().split(' ')[0];
           
           // Add to sales data if it's within the last 7 days
           if (salesByDate[invDateStr]) {

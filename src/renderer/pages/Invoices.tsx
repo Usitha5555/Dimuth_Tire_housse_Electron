@@ -85,7 +85,14 @@ const Invoices = () => {
                   {invoice.payment_method}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(invoice.created_at).toLocaleDateString()}
+                  {(() => {
+                    // Extract date part directly from local datetime string (format: "YYYY-MM-DD HH:MM:SS")
+                    // This avoids timezone conversion issues
+                    const dateStr = invoice.created_at.toString().split(' ')[0];
+                    const [year, month, day] = dateStr.split('-');
+                    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                  })()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button
@@ -181,7 +188,16 @@ const InvoiceDetailModal = ({ invoice, onClose }: InvoiceDetailModalProps) => {
             <div>
               <p className="text-sm text-gray-500">Date</p>
               <p className="font-medium">
-                {new Date(invoiceDetail.created_at).toLocaleString()}
+                {(() => {
+                  // Extract date and time directly from local datetime string (format: "YYYY-MM-DD HH:MM:SS")
+                  // This avoids timezone conversion issues
+                  const dateTimeStr = invoiceDetail.created_at.toString();
+                  const [datePart, timePart] = dateTimeStr.split(' ');
+                  const [year, month, day] = datePart.split('-');
+                  const [hour, minute] = timePart ? timePart.split(':') : ['00', '00'];
+                  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+                  return date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                })()}
               </p>
             </div>
           </div>
