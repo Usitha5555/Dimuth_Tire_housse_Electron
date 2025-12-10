@@ -199,13 +199,18 @@ export function generateReceiptPDF(invoice: InvoiceData): void {
 
 /**
  * Print receipt directly (opens print dialog)
+ * Uses iframe to avoid popup blockers
  */
 export function printReceipt(invoice: InvoiceData): void {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Please allow popups to print receipt');
-    return;
-  }
+  // Create a hidden iframe instead of popup window to avoid popup blockers
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
 
   // Extract date and time directly from local datetime string (format: "YYYY-MM-DD HH:MM:SS")
   // This avoids timezone conversion issues
@@ -216,6 +221,14 @@ export function printReceipt(invoice: InvoiceData): void {
   const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
   const formattedDate = format(date, 'dd MMM yyyy, hh:mm a');
 
+  const printWindow = iframe.contentWindow;
+  if (!printWindow) {
+    document.body.removeChild(iframe);
+    alert('Failed to initialize print window');
+    return;
+  }
+
+  printWindow.document.open();
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -365,15 +378,15 @@ export function printReceipt(invoice: InvoiceData): void {
       <script>
         window.onload = function() {
           window.print();
-          window.onafterprint = function() {
-            window.close();
-          };
+          // Close iframe after printing
+          setTimeout(function() {
+            window.parent.document.body.removeChild(window.frameElement);
+          }, 1000);
         };
       </script>
     </body>
     </html>
   `);
-
   printWindow.document.close();
 }
 

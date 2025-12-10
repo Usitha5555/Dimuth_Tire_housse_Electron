@@ -1,5 +1,22 @@
 import { ipcMain, app } from 'electron';
 import { getDatabase } from './database';
+import {
+  loadBackupSettings,
+  saveBackupSettings,
+  selectBackupFolder,
+  createBackup,
+  startBackupScheduler,
+} from './backup';
+import {
+  adminExists,
+  createAdminAccount,
+  verifyLogin,
+  verifyMasterKey,
+  verifyPassword,
+  changePassword,
+  getAdminInfo,
+  generateMasterKey,
+} from './auth';
 
 /**
  * Setup all IPC handlers for communication between renderer and main process
@@ -457,6 +474,148 @@ export function setupIpcHandlers(): void {
     return { summary: sales, topProducts };
   });
 
+  ipcMain.handle('reports:dateRangeSales', async (_, startDate: string, endDate: string) => {
+    const db = getDatabase();
+    const summaryResult: any = db.prepare(`
+      SELECT 
+        COUNT(*) as total_invoices,
+        COALESCE(SUM(total_amount), 0) as total_revenue,
+        COALESCE(SUM(subtotal), 0) as total_subtotal,
+        COALESCE(SUM(tax_amount), 0) as total_tax,
+        COALESCE(SUM(discount_amount), 0) as total_discount,
+        COALESCE(AVG(total_amount), 0) as avg_invoice_value
+      FROM invoices
+      WHERE SUBSTR(created_at, 1, 10) >= ? AND SUBSTR(created_at, 1, 10) <= ?
+    `).get(startDate, endDate);
+    
+    const summary = {
+      total_invoices: summaryResult?.total_invoices || 0,
+      total_revenue: summaryResult?.total_revenue || 0,
+      total_subtotal: summaryResult?.total_subtotal || 0,
+      total_tax: summaryResult?.total_tax || 0,
+      total_discount: summaryResult?.total_discount || 0,
+      avg_invoice_value: summaryResult?.avg_invoice_value || 0,
+    };
+    
+    const dailyBreakdown = db.prepare(`
+      SELECT 
+        SUBSTR(created_at, 1, 10) as date,
+        COUNT(*) as invoices,
+        COALESCE(SUM(total_amount), 0) as revenue
+      FROM invoices
+      WHERE SUBSTR(created_at, 1, 10) >= ? AND SUBSTR(created_at, 1, 10) <= ?
+      GROUP BY SUBSTR(created_at, 1, 10)
+      ORDER BY date ASC
+    `).all(startDate, endDate);
+    
+    const topProducts = db.prepare(`
+      SELECT 
+        ii.product_name,
+        SUM(ii.quantity) as total_quantity,
+        SUM(ii.total_price) as total_revenue
+      FROM invoice_items ii
+      INNER JOIN invoices i ON ii.invoice_id = i.id
+      WHERE SUBSTR(i.created_at, 1, 10) >= ? AND SUBSTR(i.created_at, 1, 10) <= ?
+      GROUP BY ii.product_id, ii.product_name
+      ORDER BY total_revenue DESC
+      LIMIT 10
+    `).all(startDate, endDate);
+    
+    const paymentMethods = db.prepare(`
+      SELECT 
+        payment_method,
+        COUNT(*) as count,
+        COALESCE(SUM(total_amount), 0) as total
+      FROM invoices
+      WHERE SUBSTR(created_at, 1, 10) >= ? AND SUBSTR(created_at, 1, 10) <= ?
+      GROUP BY payment_method
+      ORDER BY total DESC
+    `).all(startDate, endDate);
+    
+    return { summary, dailyBreakdown: dailyBreakdown || [], topProducts: topProducts || [], paymentMethods: paymentMethods || [] };
+  });
+
+  ipcMain.handle('reports:productPerformance', async () => {
+    const db = getDatabase();
+    
+    const bestSellers = db.prepare(`
+      SELECT 
+        ii.product_name,
+        SUM(ii.quantity) as total_sold,
+        SUM(ii.total_price) as total_revenue,
+        AVG(ii.unit_price) as avg_price
+      FROM invoice_items ii
+      INNER JOIN invoices i ON ii.invoice_id = i.id
+      GROUP BY ii.product_id, ii.product_name
+      ORDER BY total_sold DESC
+      LIMIT 10
+    `).all();
+    
+    const slowMovers = db.prepare(`
+      SELECT 
+        p.name as product_name,
+        p.stock_quantity,
+        MAX(i.created_at) as last_sold
+      FROM products p
+      LEFT JOIN invoice_items ii ON p.id = ii.product_id
+      LEFT JOIN invoices i ON ii.invoice_id = i.id
+      WHERE p.stock_quantity > 0
+      GROUP BY p.id, p.name, p.stock_quantity
+      HAVING last_sold IS NULL OR 
+        (julianday('now') - julianday(last_sold)) > 30
+      ORDER BY p.stock_quantity DESC
+      LIMIT 10
+    `).all();
+    
+    return { bestSellers: bestSellers || [], slowMovers: slowMovers || [] };
+  });
+
+  ipcMain.handle('reports:customerReport', async () => {
+    const db = getDatabase();
+    
+    const totalCustomers: any = db.prepare(`
+      SELECT COUNT(DISTINCT customer_name) as count
+      FROM invoices
+      WHERE customer_name IS NOT NULL AND customer_name != ''
+    `).get();
+    
+    const repeatCustomers: any = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM (
+        SELECT customer_name
+        FROM invoices
+        WHERE customer_name IS NOT NULL AND customer_name != ''
+        GROUP BY customer_name
+        HAVING COUNT(*) > 1
+      )
+    `).get();
+    
+    const avgPurchase: any = db.prepare(`
+      SELECT AVG(total_amount) as avg
+      FROM invoices
+    `).get();
+    
+    const topCustomers = db.prepare(`
+      SELECT 
+        customer_name,
+        customer_phone,
+        COUNT(*) as invoice_count,
+        SUM(total_amount) as total_spent
+      FROM invoices
+      WHERE customer_name IS NOT NULL AND customer_name != ''
+      GROUP BY customer_name, customer_phone
+      ORDER BY total_spent DESC
+      LIMIT 10
+    `).all();
+    
+    return {
+      totalCustomers: totalCustomers?.count || 0,
+      repeatCustomers: repeatCustomers?.count || 0,
+      avgPurchase: avgPurchase?.avg || 0,
+      topCustomers: topCustomers || [],
+    };
+  });
+
   // ========== UTILITY HANDLERS ==========
 
   ipcMain.handle('app:getVersion', async () => {
@@ -465,6 +624,129 @@ export function setupIpcHandlers(): void {
 
   ipcMain.handle('app:getDbPath', async () => {
     return app.getPath('userData');
+  });
+
+  // ========== BACKUP HANDLERS ==========
+
+  ipcMain.handle('backup:getSettings', async () => {
+    return loadBackupSettings();
+  });
+
+  ipcMain.handle('backup:updateSettings', async (_, settings: any) => {
+    saveBackupSettings(settings);
+    // Restart scheduler if auto-backup is enabled
+    if (settings.autoBackupEnabled) {
+      startBackupScheduler();
+    }
+    return settings;
+  });
+
+  ipcMain.handle('backup:selectFolder', async () => {
+    return await selectBackupFolder();
+  });
+
+  ipcMain.handle('backup:createBackup', async (_, dateRange?: { startDate: string; endDate: string }) => {
+    const settings = loadBackupSettings();
+    if (!settings.backupPath) {
+      throw new Error('Backup folder not configured');
+    }
+    return createBackup(settings.backupFormat, dateRange);
+  });
+
+  ipcMain.handle('backup:getStatus', async () => {
+    const settings = loadBackupSettings();
+    if (!settings.backupPath) {
+      return 'Backup folder not configured';
+    }
+    if (!settings.autoBackupEnabled) {
+      return 'Automatic backups are disabled';
+    }
+    if (settings.lastBackupDate) {
+      const lastBackup = new Date(settings.lastBackupDate);
+      const now = new Date();
+      const daysSinceBackup = Math.floor((now.getTime() - lastBackup.getTime()) / (1000 * 60 * 60 * 24));
+      return `Last backup: ${daysSinceBackup} day(s) ago. Next backup scheduled for midnight.`;
+    }
+    return 'No backups created yet. Next backup scheduled for midnight.';
+  });
+
+  // Start backup scheduler on app start if auto-backup is enabled
+  const settings = loadBackupSettings();
+  if (settings.autoBackupEnabled) {
+    startBackupScheduler();
+  }
+
+  // ========== AUTH HANDLERS ==========
+
+  ipcMain.handle('auth:checkSetup', async () => {
+    return adminExists();
+  });
+
+  ipcMain.handle('auth:setup', async (_, username: string, password: string) => {
+    if (adminExists()) {
+      throw new Error('Admin account already exists');
+    }
+    
+    const masterKey = generateMasterKey();
+    await createAdminAccount(username, password, masterKey);
+    
+    return { masterKey };
+  });
+
+  ipcMain.handle('auth:login', async (_, username: string, password: string) => {
+    try {
+      const isValid = await verifyLogin(username, password);
+      if (!isValid) {
+        throw new Error('Invalid username or password');
+      }
+      return getAdminInfo();
+    } catch (error: any) {
+      // Re-throw with clean error message
+      throw new Error(error.message || 'Invalid username or password');
+    }
+  });
+
+  ipcMain.handle('auth:getCurrentUser', async () => {
+    return getAdminInfo();
+  });
+
+  ipcMain.handle('auth:changePassword', async (_, currentPassword: string, newPassword: string) => {
+    const db = getDatabase();
+    const admin = db.prepare('SELECT username, password_hash FROM admin LIMIT 1').get() as any;
+    
+    if (!admin) {
+      throw new Error('Admin account not found');
+    }
+    
+    const isValid = await verifyPassword(currentPassword, admin.password_hash);
+    if (!isValid) {
+      throw new Error('Current password is incorrect');
+    }
+    
+    await changePassword(newPassword);
+    return { success: true };
+  });
+
+  ipcMain.handle('auth:resetPassword', async (_, masterKey: string, newPassword: string) => {
+    const isValid = await verifyMasterKey(masterKey);
+    if (!isValid) {
+      throw new Error('Invalid master key');
+    }
+    
+    await changePassword(newPassword);
+    return { success: true };
+  });
+
+  ipcMain.handle('auth:logout', async () => {
+    // Session is managed on the frontend, but we can add cleanup here if needed
+    return { success: true };
+  });
+
+  // Temporary handler to delete admin account (for testing/reset)
+  ipcMain.handle('auth:deleteAdmin', async () => {
+    const db = getDatabase();
+    const result = db.prepare('DELETE FROM admin').run();
+    return { deleted: result.changes };
   });
 }
 

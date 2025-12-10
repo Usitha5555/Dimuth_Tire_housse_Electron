@@ -15,6 +15,11 @@ export const useToast = () => {
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = toastId++;
     setToasts((prev) => [...prev, { id, message, type }]);
+    
+    // Auto-remove toast after duration
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3000);
   }, []);
 
   const removeToast = useCallback((id: number) => {

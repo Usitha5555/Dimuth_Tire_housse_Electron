@@ -17,6 +17,8 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "bcrypt": "^6.0.0",
     "better-sqlite3": "^9.2.2",
     "date-fns": "^3.0.6",
     "jspdf": "^2.5.1",
@@ -44,6 +46,7 @@
   "build": {
     "appId": "com.dimuth.tirehouse.pos",
     "productName": "Dimuth Tirehouse POS",
+    "asar": false,
     "directories": {
       "output": "release"
     },

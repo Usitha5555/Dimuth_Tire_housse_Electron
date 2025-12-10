@@ -12,6 +12,8 @@ const Products = () => {
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
   const [filterType, setFilterType] = useState<ProductType | 'all'>('all');
   const [showBrandSizeManager, setShowBrandSizeManager] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     loadProducts();
@@ -52,37 +54,92 @@ const Products = () => {
     return matchesSearch && matchesType;
   });
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType]);
+
+  const totalProducts = products.length;
+  const tireCount = products.filter(p => p.product_type === 'tire').length;
+  const wheelCount = products.filter(p => p.product_type === 'alloy_wheel').length;
+  const lowStockCount = products.filter(p => p.stock_quantity <= p.low_stock_threshold).length;
+
   if (loading) {
-    return <div className="text-center py-8">Loading products...</div>;
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="ml-3 text-gray-600">Loading products...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-4">
-        <div className="flex justify-between items-center gap-4">
-          <div className="flex-1 max-w-md">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Products</h2>
+            <p className="text-blue-100 text-sm">Manage your inventory and product catalog</p>
+          </div>
+          <div className="flex gap-3">
+            <div className="bg-white rounded-lg px-4 py-2 text-right shadow-md">
+              <p className="text-gray-600 text-xs mb-0.5">Total Products</p>
+              <p className="text-2xl font-bold text-blue-600">{totalProducts}</p>
+            </div>
+            <div className="bg-white rounded-lg px-4 py-2 text-right shadow-md">
+              <p className="text-gray-600 text-xs mb-0.5">Tires</p>
+              <p className="text-2xl font-bold text-blue-600">{tireCount}</p>
+            </div>
+            <div className="bg-white rounded-lg px-4 py-2 text-right shadow-md">
+              <p className="text-gray-600 text-xs mb-0.5">Wheels</p>
+              <p className="text-2xl font-bold text-blue-600">{wheelCount}</p>
+            </div>
+            <div className="bg-white rounded-lg px-4 py-2 text-right shadow-md">
+              <p className="text-gray-600 text-xs mb-0.5">Low Stock</p>
+              <p className="text-2xl font-bold text-red-600">{lowStockCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters and Actions */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          <div className="flex-1">
             <input
               type="text"
               placeholder="Search products by name, SKU, or size..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value as ProductType | 'all')}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="all">All Products</option>
-            <option value="tire">Tires</option>
-            <option value="alloy_wheel">Alloy Wheels</option>
-            <option value="general">General</option>
-          </select>
+          <div className="md:w-48">
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as ProductType | 'all')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="all">All Products</option>
+              <option value="tire">Tires</option>
+              <option value="alloy_wheel">Alloy Wheels</option>
+              <option value="general">General</option>
+            </select>
+          </div>
           <button
             onClick={() => setShowBrandSizeManager(true)}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+            className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-medium transition-colors flex items-center gap-2"
           >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
             Manage Brands & Sizes
           </button>
           <button
@@ -90,121 +147,233 @@ const Products = () => {
               setEditingProduct(null);
               setShowModal(true);
             }}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md hover:shadow-lg transition-all flex items-center gap-2"
           >
-            + Add Product
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Product
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Type/Size
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  SKU
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Stock
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Actions
-                </th>
-              </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredProducts.map((product) => (
-              <tr key={product.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">
-                    {product.name}
-                  </div>
-                  {product.description && (
-                    <div className="text-sm text-gray-500">
-                      {product.description}
-                    </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      product.product_type === 'tire' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : product.product_type === 'alloy_wheel'
-                        ? 'bg-purple-100 text-purple-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {product.product_type === 'tire' ? 'Tire' : 
-                       product.product_type === 'alloy_wheel' ? 'Wheel' : 'General'}
-                    </span>
-                    {product.size_display && (
-                      <div className="text-xs text-gray-600 mt-1">
-                        {product.size_display}
+      {filteredProducts.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+          <p className="mt-4 text-gray-500 text-lg">No products found</p>
+          <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filters</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Product
+                    </th>
+                    <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type & Size
+                    </th>
+                    <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      SKU
+                    </th>
+                    <th className="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Price
+                    </th>
+                    <th className="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stock
+                    </th>
+                    <th className="px-6 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paginatedProducts.map((product) => (
+                  <tr 
+                    key={product.id} 
+                    className="hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="px-6 py-2.5">
+                      <div className="text-sm font-medium text-gray-900">
+                        {product.name}
                       </div>
-                    )}
-                    {product.product_type === 'alloy_wheel' && product.wheel_stud_count && product.wheel_stud_type && (
-                      <div className="text-xs font-semibold text-purple-700 mt-1">
-                        🔩 {product.wheel_stud_count} Stud • {product.wheel_stud_type}
+                      {product.description && (
+                        <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
+                          {product.description}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-2.5">
+                      <div className="space-y-0.5">
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                          product.product_type === 'tire' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : product.product_type === 'alloy_wheel'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {product.product_type === 'tire' ? 'Tire' : 
+                           product.product_type === 'alloy_wheel' ? 'Wheel' : 'General'}
+                        </span>
+                        {product.size_display && (
+                          <div className="text-xs text-gray-600 mt-0.5">
+                            {product.size_display}
+                          </div>
+                        )}
+                        {product.product_type === 'alloy_wheel' && product.wheel_stud_count && product.wheel_stud_type && (
+                          <div className="text-xs text-gray-600 mt-0.5">
+                            {product.wheel_stud_count} Stud • {product.wheel_stud_type}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {product.sku || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  Rs. {product.price.toFixed(2)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`text-sm font-medium ${
-                      product.stock_quantity <= product.low_stock_threshold
-                        ? 'text-red-600'
-                        : 'text-gray-900'
-                    }`}
-                  >
-                    {product.stock_quantity}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => {
-                      setAdjustingProduct(product);
-                    }}
-                    className="text-blue-600 hover:text-blue-900 mr-3"
-                  >
-                    Adjust Stock
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingProduct(product);
-                      setShowModal(true);
-                    }}
-                    className="text-primary-600 hover:text-primary-900 mr-3"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product.id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                    <td className="px-6 py-2.5 whitespace-nowrap text-sm text-gray-500">
+                      {product.sku || <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="px-6 py-2.5 whitespace-nowrap text-right">
+                      <div className="text-sm font-medium text-gray-900">
+                        Rs. {product.price.toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-2.5 whitespace-nowrap text-right">
+                      <span
+                        className={`text-sm font-medium ${
+                          product.stock_quantity <= product.low_stock_threshold
+                            ? 'text-red-600'
+                            : 'text-gray-900'
+                        }`}
+                      >
+                        {product.stock_quantity}
+                      </span>
+                    </td>
+                    <td className="px-6 py-2.5 whitespace-nowrap text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => {
+                            setAdjustingProduct(product);
+                          }}
+                          className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                          title="Adjust Stock"
+                        >
+                          Stock
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingProduct(product);
+                            setShowModal(true);
+                          }}
+                          className="px-3 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                          title="Edit Product"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="px-3 py-1 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                          title="Delete Product"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                    <span className="font-medium">{Math.min(endIndex, filteredProducts.length)}</span> of{' '}
+                    <span className="font-medium">{filteredProducts.length}</span> results
+                  </p>
+                </div>
+                <div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Previous</span>
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    
+                    {/* Page Numbers */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      // Show first page, last page, current page, and pages around current
+                      if (
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      ) {
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                              currentPage === page
+                                ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      } else if (page === currentPage - 2 || page === currentPage + 2) {
+                        return (
+                          <span key={page} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                            ...
+                          </span>
+                        );
+                      }
+                      return null;
+                    })}
+                    
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Next</span>
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {showModal && (
         <ProductModal
@@ -515,7 +684,7 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
         return;
       }
       if (!formData.price || parseFloat(formData.price) <= 0) {
-        alert('Product price is required and must be greater than 0');
+        alert('Selling price is required and must be greater than 0');
         return;
       }
       if (!formData.stock_quantity || parseInt(formData.stock_quantity) < 0) {
@@ -636,7 +805,7 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                 <button
                   type="button"
                   onClick={() => setShowAddBrand(true)}
-                  className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 font-bold"
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold"
                   title="Add new brand"
                 >
                   +
@@ -1206,7 +1375,7 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Price *
+                Selling Price *
               </label>
               <input
                 type="number"
@@ -1217,11 +1386,12 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                   setFormData({ ...formData, price: e.target.value })
                 }
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Price you sell to customers"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Cost Price
+                Bought Price
               </label>
               <input
                 type="number"
@@ -1231,6 +1401,7 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
                   setFormData({ ...formData, cost_price: e.target.value })
                 }
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Price you bought from supplier"
               />
             </div>
           </div>
@@ -1276,7 +1447,7 @@ const ProductModal = ({ product, onClose, onSave }: ProductModalProps) => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               {product ? 'Update' : 'Create'}
             </button>

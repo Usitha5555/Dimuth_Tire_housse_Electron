@@ -303,6 +303,18 @@ function runMigrations(): void {
       // Ignore if table doesn't exist or no rows to delete
     }
 
+    // Create admin table for authentication
+    db!.exec(`
+      CREATE TABLE IF NOT EXISTS admin (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        master_key TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_login DATETIME
+      )
+    `);
+
     // Create indexes for better query performance
     db!.exec(`
       CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
@@ -318,6 +330,7 @@ function runMigrations(): void {
       CREATE INDEX IF NOT EXISTS idx_invoice_items_product_id ON invoice_items(product_id);
       CREATE INDEX IF NOT EXISTS idx_stock_movements_product_id ON stock_movements(product_id);
       CREATE INDEX IF NOT EXISTS idx_stock_movements_created_at ON stock_movements(created_at);
+      CREATE INDEX IF NOT EXISTS idx_admin_username ON admin(username);
     `);
 
     // Create trigger to update updated_at timestamp

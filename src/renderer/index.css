@@ -43,11 +43,11 @@ code {
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-  background: #111827;
+  background: #f3f4f6;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: #9ca3af;
   border-radius: 3px;
 }
 
@@ -58,5 +58,57 @@ code {
 /* Hide scrollbar when collapsed */
 .scrollbar-thin:not(.overflow-hidden)::-webkit-scrollbar {
   display: block;
+}
+
+/* Parallax Blob Animation for Login Page */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Wave Animation */
+@keyframes wave {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-wave {
+  background: linear-gradient(90deg, #2563eb 0%, #3b82f6 50%, #2563eb 100%);
+  background-size: 200% 100%;
+  animation: wave 3s ease-in-out infinite;
+}
+
+.animate-wave:hover {
+  animation: none;
+  background: #1d4ed8;
 }
 

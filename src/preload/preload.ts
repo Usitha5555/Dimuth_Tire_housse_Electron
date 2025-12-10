@@ -52,6 +52,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reports APIs
   reports: {
     dailySales: (date: string) => ipcRenderer.invoke('reports:dailySales', date),
+    dateRangeSales: (startDate: string, endDate: string) => ipcRenderer.invoke('reports:dateRangeSales', startDate, endDate),
+    productPerformance: () => ipcRenderer.invoke('reports:productPerformance'),
+    customerReport: () => ipcRenderer.invoke('reports:customerReport'),
+  },
+
+  // Backup APIs
+      backup: {
+        getSettings: () => ipcRenderer.invoke('backup:getSettings'),
+        updateSettings: (settings: any) => ipcRenderer.invoke('backup:updateSettings', settings),
+        selectFolder: () => ipcRenderer.invoke('backup:selectFolder'),
+        createBackup: (dateRange?: { startDate: string; endDate: string }) => ipcRenderer.invoke('backup:createBackup', dateRange),
+        getStatus: () => ipcRenderer.invoke('backup:getStatus'),
+      },
+
+  // Auth APIs
+  auth: {
+    checkSetup: () => ipcRenderer.invoke('auth:checkSetup'),
+    setup: (username: string, password: string) => ipcRenderer.invoke('auth:setup', username, password),
+    login: (username: string, password: string) => ipcRenderer.invoke('auth:login', username, password),
+    logout: () => ipcRenderer.invoke('auth:logout'),
+    getCurrentUser: () => ipcRenderer.invoke('auth:getCurrentUser'),
+    changePassword: (currentPassword: string, newPassword: string) => ipcRenderer.invoke('auth:changePassword', currentPassword, newPassword),
+    resetPassword: (masterKey: string, newPassword: string) => ipcRenderer.invoke('auth:resetPassword', masterKey, newPassword),
+    deleteAdmin: () => ipcRenderer.invoke('auth:deleteAdmin'),
   },
 
   // App utilities
@@ -81,6 +105,26 @@ declare global {
       };
       reports: {
         dailySales: (date: string) => Promise<any>;
+        dateRangeSales: (startDate: string, endDate: string) => Promise<any>;
+        productPerformance: () => Promise<any>;
+        customerReport: () => Promise<any>;
+      };
+      backup: {
+        getSettings: () => Promise<any>;
+        updateSettings: (settings: any) => Promise<any>;
+        selectFolder: () => Promise<string | null>;
+        createBackup: (dateRange?: { startDate: string; endDate: string }) => Promise<{ filename: string; path: string }>;
+        getStatus: () => Promise<string>;
+      };
+      auth: {
+        checkSetup: () => Promise<boolean>;
+        setup: (username: string, password: string) => Promise<{ masterKey: string }>;
+        login: (username: string, password: string) => Promise<{ username: string; last_login: string | null } | null>;
+        logout: () => Promise<{ success: boolean }>;
+        getCurrentUser: () => Promise<{ username: string; last_login: string | null } | null>;
+        changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean }>;
+        resetPassword: (masterKey: string, newPassword: string) => Promise<{ success: boolean }>;
+        deleteAdmin: () => Promise<{ deleted: number }>;
       };
       app: {
         getVersion: () => Promise<string>;
